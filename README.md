@@ -19,6 +19,7 @@ Developed for **Northwestern University - Fall 2025 Data Engineering Final Proje
 ---
 
 ## 📦 File Structure
+
 currents-news-reporting/
 ├── dags/
 │ └── news_pipeline_dag.py # Airflow DAG script
