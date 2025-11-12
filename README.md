@@ -21,10 +21,15 @@ Developed for **Northwestern University - Fall 2025 Data Engineering Final Proje
 ## 📦 File Structure
 currents-news-reporting/
 ├── dags/
-│   └── news_pipeline_dag.py
-├── docker-compose.yaml
-├── requirements.txt
-├── .env.example
-├── .gitignore
-└── README.md
+│ └── news_pipeline_dag.py # Airflow DAG script
+├── src/
+│ ├── news_api_utils.py # API connection and data fetching functions
+│ ├── db_utils.py # Database helper functions
+│ ├── analysis_utils.py # Simple EDA functions
+│ └── init.py
+├── docker-compose.yaml # Docker configuration for Airflow
+├── requirements.txt # Python dependencies
+├── .env.example # Environment variable template (no real API key)
+├── .gitignore # Files to ignore in Git
+└── README.md # Project documentation
 
