@@ -22,7 +22,7 @@ def get_latest_news(key):
     return data
 
 
-def get_news_search(key, start_date=None, end_date=None, keyword=None, size=200, page=None):
+def get_news_search(key, start_date=None, end_date=None, keyword=None, region=None, size=200, page=None):
     """
     Retrieves news based on search parameters.
     Parameters:
@@ -30,6 +30,7 @@ def get_news_search(key, start_date=None, end_date=None, keyword=None, size=200,
         start_date (str): Start date for the news search in 'YYYY-MM-DDTHH:MM:SS.ss[+-]hh:mm' format.
         end_date (str): End date for the news search in 'YYYY-MM-DDTHH:MM:SS.ss[+-]hh:mm' format.
         keyword (str): Keyword to search for in title or description of news articles.
+        region (str): Region code to filter news articles.
         size (int): Number of articles to retrieve per page (default is 200).
         page (int): Page number for pagination.
     Returns:
@@ -53,6 +54,9 @@ def get_news_search(key, start_date=None, end_date=None, keyword=None, size=200,
 
     if page:
         params['page'] = page
+
+    if region:
+        params['country'] = region
 
     response = requests.get(url, params=params)
     data = response.json()
@@ -106,19 +110,19 @@ if __name__ == "__main__":
     API_KEY = os.getenv('API_KEY')
     
     # get news from date range
-    dates = pd.date_range(start="2025-08-01", end="2025-08-21")
+    dates = pd.date_range(start="2025-08-22", end="2025-08-22")
 
     for d in dates:
         date = d.strftime("%Y-%m-%dT00:00:00Z")
 
-        data = get_news_search(API_KEY, start_date=date, end_date=date, keyword='world')
+        data = get_news_search(API_KEY, region='CN')
 
         # print message and skip if not valid response
         if data['status'] != "ok":
             print(data['msg'])
 
         # save to json file
-        with open(f'data_{d.strftime("%Y_%m_%d")}.json', 'w') as f:
+        with open(f'china_data.json', 'w') as f:
             json.dump(data, f)
 
 
