@@ -17,7 +17,7 @@ Developed for **Northwestern University - Fall 2025 Data Engineering Final Proje
 - Perform exploratory data analysis (EDA) on the news dataset
 
 ---
-
+```
 ## 📦 File Structure
 
 currents-news-reporting/
@@ -33,4 +33,4 @@ currents-news-reporting/
 ├── .env.example # Environment variable template (no real API key)
 ├── .gitignore # Files to ignore in Git
 └── README.md # Project documentation
-
+```
