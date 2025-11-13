@@ -1,6 +1,7 @@
 import os, json, requests
 from dotenv import load_dotenv
 import pandas as pd
+import glob
 
 def get_latest_news(key):
     """
@@ -104,25 +105,61 @@ def get_regions(key):
     return data
 
 
+def save_to_csv(path, filename):
+    """
+    Saves news data from JSON files in the specified path to a CSV file.
+    Parameters:
+        path (str): Path to the directory containing JSON file(s) of news data.
+        filename (str): Name of the output CSV file.
+    """
+    files = glob.glob(f"{path}/*.json")
+
+    news_dict = {
+        'id': [],
+        'title': [],
+        'description': [],
+        'author': [],
+        'url': [],
+        'image': [],
+        'language': [],
+        'category': [],
+        'published': []
+    }
+
+    for file in files:
+        with open(file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            if data['status'] == 'ok':    
+                news = data['news']
+
+                for n in news:
+                    for k in news_dict.keys():
+                        news_dict[k].append(n[k])
+
+    dfs = pd.DataFrame(news_dict)
+    dfs.to_csv(filename, index=False)
+
+
+
 if __name__ == "__main__":
     # load API key from .env file
     load_dotenv()
     API_KEY = os.getenv('API_KEY')
     
     # get news from date range
-    dates = pd.date_range(start="2025-08-22", end="2025-08-22")
-
+    dates = pd.date_range(start="2025-09-10", end="2025-09-11")
+    
     for d in dates:
         date = d.strftime("%Y-%m-%dT00:00:00Z")
 
-        data = get_news_search(API_KEY, region='CN')
+        data = get_news_search(API_KEY, start_date=date, end_date=date, keyword='world')
 
         # print message and skip if not valid response
         if data['status'] != "ok":
             print(data['msg'])
 
         # save to json file
-        with open(f'china_data.json', 'w') as f:
-            json.dump(data, f)
+        with open(f'data_{d.strftime("%Y_%m_%d")}.json', 'w') as f:
+            json.dump(data, f)    
 
 
