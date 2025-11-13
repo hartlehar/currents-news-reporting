@@ -35,6 +35,7 @@ currents-news-reporting/
 └── README.md # Project documentation
 ```
 ## System Architecture
+```
             ┌──────────────┐
             │ Currents API │
             └──────┬───────┘
@@ -55,4 +56,4 @@ currents-news-reporting/
       ┌──────────────────────────┐
       │    EDA, Visualization    │
       └──────────────────────────┘
-
+```
