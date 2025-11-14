@@ -34,6 +34,7 @@ currents-news-reporting/
 ├── .gitignore # Files to ignore in Git
 └── README.md # Project documentation
 ```
+
 ## System Architecture
 ```
             ┌──────────────┐
@@ -57,3 +58,4 @@ currents-news-reporting/
       │    EDA, Visualization    │
       └──────────────────────────┘
 ```
+=======

@@ -1,34 +1,95 @@
-# --- Python ---
+# ==========================
+# Python Cache / Build Files
+# ==========================
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
-*.db
-*.sqlite
-*.csv
-*.log
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.spec
 
-# --- Virtual environments ---
-venv/
+# ==========================
+# Virtual Environments
+# ==========================
 .env
-.env.local
-*.env
+.env/
+venv/
+venv*/
+ENV/
+env/
+.venv/
 
-# --- Airflow ---
+# ==========================
+# Jupyter Notebook
+# ==========================
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ==========================
+# Project Data Files
+# ==========================
+data/*.csv
+data/*.db
+data/*.sqlite
+data/*.json
+data/news.db
+
+# Allow only example empty file
+!data/.gitkeep
+
+# ==========================
+# Logs
+# ==========================
+*.log
 logs/
-airflow_logs/
-dags/__pycache__/
-plugins/__pycache__/
+airflow/logs/
 
-# --- Docker ---
+# ==========================
+# SQLite Databases
+# ==========================
+*.db
+*.sqlite3
+
+# ==========================
+# Airflow Specific
+# ==========================
+airflow/airflow.db
+airflow/airflow.cfg
+airflow/logs/
+airflow/plugins/
+airflow/*.pid
+
+# ==========================
+# Docker
+# ==========================
 *.pid
-*.sock
-tmp/
-postgres-data/
-*.tar
+docker-compose.override.yml
 
-# --- OS & IDE files ---
-.DS_Store
-Thumbs.db
-.idea/
+# ==========================
+# VSCode
+# ==========================
 .vscode/
+.history/
+
+# ==========================
+# macOS
+# ==========================
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ==========================
+# PyCharm
+# ==========================
+.idea/
+
+# ==========================
+# Other
+# ==========================
+*.tmp
+*.bak
+*.swp
