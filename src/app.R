@@ -67,8 +67,7 @@ server <- function(input, output, session) {
           a.url,
           s.source
       FROM NewsArticles a
-      LEFT JOIN NewsArticleSource asrc ON a.id = asrc.news_id
-      LEFT JOIN NewsSource s ON s.id = asrc.source_id
+      LEFT JOIN NewsSource s ON s.id = a.source_id
       WHERE a.published BETWEEN ? AND ?
         AND (? = 'All' OR s.source = ?)
         AND (? = 'All' OR a.id IN (
@@ -216,3 +215,5 @@ server <- function(input, output, session) {
 # Run the app
 shinyApp(ui, server)
 
+# Disconnect connection once finished
+dbDisconnect(con)

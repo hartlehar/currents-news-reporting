@@ -40,15 +40,17 @@ def load_main_table(cursor, df):
             title TEXT,
             description TEXT,
             author TEXT,
+            source_id INTEGER,
             url TEXT,
             image TEXT,
             language TEXT,
-            published DATE
+            published DATE,
+            FOREIGN KEY (source_id) REFERENCES NewsSource(id)
         )
     """)
 
     # Insert data
-    df.to_sql("NewsArticles", cursor.connection, if_exists="replace", index=False)
+    df.to_sql("NewsArticles", cursor.connection, if_exists="append", index=False)
 
 
 # ------------------------------------------------------------------------------
@@ -102,15 +104,13 @@ def load_category_table(cursor, df_full):
     conn.commit()
 
 # ------------------------------------------------------------------------------
-#  Load Source Table (Extract Domain)
+#  Load Source Table (Extract Domain) and Map to Articles
 # ------------------------------------------------------------------------------
 
 def load_source_table(cursor, df_full):
     """
-    Create and populate the NewsSource table.
-    Create NewsArticleSource mapping table for many-to-many relationship.
+    Create NewsArticleSource mapping table for one-to-many relationship.
     """
-
     df = df_full.copy()
     df_source = df[["id", "url"]].rename(columns={"id": "news_id"})
 
@@ -141,15 +141,7 @@ def load_source_table(cursor, df_full):
     for source in df_source["source"].unique():
         cursor.execute("INSERT INTO NewsSource (source) VALUES (?);", (source,))
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS NewsArticleSource (
-            news_id TEXT,
-            source_id INTEGER,
-            FOREIGN KEY (news_id) REFERENCES NewsArticles(id),
-            FOREIGN KEY (source_id) REFERENCES NewsSource(source_id)
-        )
-    """)
-
+    # Update NewsArticles with source_id
     for _, row in df_source.iterrows():
         news_id = row["news_id"]
         source = row["source"]
@@ -158,9 +150,10 @@ def load_source_table(cursor, df_full):
         source_id = cursor.fetchone()
         if source_id:
             cursor.execute("""
-                INSERT INTO NewsArticleSource (news_id, source_id)
-                VALUES (?, ?);
-            """, (news_id, source_id[0]))
+                UPDATE NewsArticles
+                SET source_id = ?
+                WHERE id = ?;
+            """, (source_id[0], news_id))
 
     conn.commit()
 
