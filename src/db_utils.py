@@ -161,6 +161,8 @@ def load_source_table(cursor, df_full):
                 VALUES (?, ?);
             """, (news_id, source_id[0]))
 
+    conn.commit()
+
 
 # ------------------------------------------------------------------------------
 #  Main Process
