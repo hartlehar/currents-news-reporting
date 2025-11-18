@@ -40,6 +40,7 @@ def load_main_table(cursor, df):
             title TEXT,
             description TEXT,
             author TEXT,
+            url TEXT,
             image TEXT,
             language TEXT,
             published DATE
@@ -176,7 +177,7 @@ if __name__ == "__main__":
 
     # Basic cleaned dataframe
     df = pd.read_csv(latest_csv)
-    df = df.drop(columns=["category", "url"], errors="ignore")
+    df = df.drop(columns=["category"], errors="ignore")
     df["published"] = pd.to_datetime(df["published"], errors="coerce").dt.date
 
     # Full version for category & url processing

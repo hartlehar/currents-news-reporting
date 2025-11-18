@@ -1,5 +1,6 @@
 # Load libraries
 library(shiny)
+library(shinydashboard)
 library(DBI)
 library(RSQLite)
 library(dplyr)
@@ -15,49 +16,42 @@ categories <- dbGetQuery(con, "SELECT category FROM NewsCategory ORDER BY catego
 sources <- dbGetQuery(con, "SELECT source FROM NewsSource ORDER BY source")$source
 
 # UI
-ui <- fluidPage(
-  titlePanel("World News Dashboard"),
+ui <- dashboardPage(
+  dashboardHeader(title = "World News Dashboard"),
   
-  sidebarLayout(
-    sidebarPanel(
-      dateRangeInput("dates", "Date Range", 
-                     start = "2024-01-01",
-                     end = Sys.Date()),
-      selectInput("category", "Category", choices = c("All", categories)),
-      selectInput("source", "Source", choices = c("All", sources)),
-      textInput("keyword", "Keyword Search", ""),
-      actionButton("apply", "Apply Filters")
+  dashboardSidebar(
+    width = 250,
+    dateRangeInput("dates", "Date Range", start = "2024-01-01", end = Sys.Date()),
+    selectInput("category", "Category", choices = c("All", categories)),
+    selectInput("source", "Source", choices = c("All", sources)),
+    textInput("keyword", "Keyword Search", ""),
+    actionButton("apply", "Apply Filters")
+  ),
+  
+  dashboardBody(
+    fluidRow(
+      box(width = 12, title = "Articles Over Time", status = "primary", solidHeader = TRUE,
+          plotOutput("articles_over_time", height = "300px"))
     ),
-    
-    mainPanel(
-      tabsetPanel(
-        tabPanel("Summary",
-                 plotOutput("articles_over_time"),
-                 plotOutput("top_sources"),
-                 plotOutput("top_categories")
-        ),
-        tabPanel("Articles",
-                 DTOutput("table")
-        )
-      )
+    fluidRow(
+      box(width = 6, title = "Top Sources", status = "success", solidHeader = TRUE,
+          plotOutput("top_sources", height = "300px")),
+      box(width = 6, title = "Top Categories", status = "info", solidHeader = TRUE,
+          plotOutput("top_categories", height = "300px"))
+    ),
+    fluidRow(
+      box(width = 12, title = "Articles", status = "warning", solidHeader = TRUE,
+          DTOutput("table"))
     )
   )
 )
 
 # SERVER
 server <- function(input, output, session) {
-  
-  # Reactive filtered data
   filtered_data <- eventReactive(input$apply, {
-    
-    # Convert dates to character for SQLite
     start_date <- as.character(input$dates[1])
     end_date   <- as.character(input$dates[2])
-    
-    # Handle empty keyword
-    kw <- ifelse(nchar(input$keyword) > 0,
-                 paste0("%", input$keyword, "%"),
-                 "%")
+    kw <- ifelse(nchar(input$keyword) > 0, paste0("%", input$keyword, "%"), "%")
     
     sql <- "
       SELECT 
@@ -65,6 +59,7 @@ server <- function(input, output, session) {
           a.title,
           a.description,
           a.published,
+          a.url,
           s.source
       FROM NewsArticles a
       LEFT JOIN NewsArticleSource asrc ON a.id = asrc.news_id
@@ -88,30 +83,39 @@ server <- function(input, output, session) {
       kw, kw
     ))
     
-    # Convert published to Date
     df$published <- as.Date(df$published)
-    
+    df
+  }, ignoreNULL = FALSE)
+  
+  # returns filtered data if available, else defaults
+  get_data <- reactive({
+    df <- filtered_data()
+    if (is.null(df) || nrow(df) == 0) return(data.frame())
     df
   })
   
   # Articles Over Time Plot
   output$articles_over_time <- renderPlot({
-    df <- filtered_data()
-    if (is.null(df) || nrow(df) == 0) return(NULL)
+    df <- get_data()
+    if (nrow(df) == 0) return(NULL)
     
     df %>%
       count(published) %>%
       ggplot(aes(x = published, y = n)) +
-      geom_line(color = "steelblue") +
-      geom_point(color = "darkblue") +
-      labs(title = "Articles Over Time", x = "Date", y = "Count") +
-      theme_minimal()
+      geom_line(color = "#0d6efd", size = 1.2) +
+      geom_point(color = "#198754", size = 2) +
+      labs(x = "Date", y = "Count") +
+      theme_minimal(base_size = 14) +
+      theme(
+        plot.title = element_text(face = "bold", size = 16),
+        axis.title = element_text(face = "bold")
+      )
   })
   
   # Top Sources Plot
   output$top_sources <- renderPlot({
-    df <- filtered_data()
-    if (is.null(df) || nrow(df) == 0) return(NULL)
+    df <- get_data()
+    if (nrow(df) == 0) return(NULL)
     
     df %>%
       count(source, sort = TRUE) %>%
@@ -119,35 +123,67 @@ server <- function(input, output, session) {
       ggplot(aes(reorder(source, n), n)) +
       geom_col(fill = "darkgreen") +
       coord_flip() +
-      labs(title = "Top Sources", x = "Source", y = "Count") +
-      theme_minimal()
+      labs(x = "Source", y = "Count") +
+      theme_minimal(base_size = 14) +
+      theme(
+        plot.title = element_text(face = "bold", size = 16),
+        axis.title = element_text(face = "bold")
+      )
   })
   
   # Top Categories Plot
   output$top_categories <- renderPlot({
+    df <- get_data()
+    if (nrow(df) == 0) return(NULL)
+    
+    # Get article-category mapping
     sql <- "
-      SELECT c.category AS category, COUNT(*) AS n
+      SELECT ac.news_id, c.category
       FROM NewsArticleCategory ac
       JOIN NewsCategory c ON ac.category_id = c.id
-      GROUP BY c.category
-      ORDER BY n DESC
-      LIMIT 10;
     "
-    df <- dbGetQuery(con, sql)
+    all_categories <- dbGetQuery(con, sql)
     
-    ggplot(df, aes(reorder(category, n), n)) +
+    filtered_categories <- all_categories %>%
+      filter(news_id %in% df$id) %>%
+      count(category, sort = TRUE) %>%
+      head(10)
+    
+    ggplot(filtered_categories, aes(reorder(category, n), n)) +
       geom_col(fill = "steelblue") +
       coord_flip() +
-      labs(title = "Top Categories", x = "Category", y = "Frequency") +
-      theme_minimal()
+      labs(x = "Category", y = "Count") +
+      theme_minimal(base_size = 14) +
+      theme(
+        plot.title = element_text(face = "bold", size = 16),
+        axis.title = element_text(face = "bold")
+      )
   })
   
-  # Articles DataTable
+  # Articles Table
   output$table <- renderDT({
-    filtered_data()
+    df <- get_data()
+    if (nrow(df) == 0) return(NULL)
+    
+    # Make URL clickable
+    df$url <- paste0('<a href="', df$url, '" target="_blank">Link</a>')
+    
+    df <- df %>% select(-id)
+    
+    datatable(
+      df,
+      escape = FALSE,
+      options = list(
+        pageLength = 10,
+        autoWidth = TRUE,
+        scrollX = TRUE
+      ),
+      class = "cell-border stripe hover"
+    )
   })
   
 }
 
 # Run the app
 shinyApp(ui, server)
+
