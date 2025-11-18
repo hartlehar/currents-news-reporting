@@ -51,7 +51,7 @@ def load_main_table(cursor, df):
 
 
 # ------------------------------------------------------------------------------
-#  Load Category Table (One-to-Many)
+#  Load Category Table (Many-to-Many)
 # ------------------------------------------------------------------------------
 
 def load_category_table(cursor, df_full):
@@ -106,7 +106,8 @@ def load_category_table(cursor, df_full):
 
 def load_source_table(cursor, df_full):
     """
-    Create and populate a table mapping news_id to its source domain.
+    Create and populate the NewsSource table.
+    Create NewsArticleSource mapping table for many-to-many relationship.
     """
 
     df = df_full.copy()
