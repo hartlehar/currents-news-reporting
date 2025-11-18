@@ -7,6 +7,7 @@ library(dplyr)
 library(ggplot2)
 library(DT)
 library(lubridate)
+library(wordcloud2)
 
 # Connect to SQLite database
 con <- dbConnect(SQLite(), "data/news.db")
@@ -32,6 +33,10 @@ ui <- dashboardPage(
     fluidRow(
       box(width = 12, title = "Articles Over Time", status = "primary", solidHeader = TRUE,
           plotOutput("articles_over_time", height = "300px"))
+    ),
+    fluidRow(
+      box(width = 12, title = "Word Cloud of Titles and Descriptions", status= "danger", solidHeader = TRUE,
+          wordcloud2Output("wordcloud", height = "400px", width = "100%"))
     ),
     fluidRow(
       box(width = 6, title = "Top Sources", status = "success", solidHeader = TRUE,
@@ -110,6 +115,30 @@ server <- function(input, output, session) {
         plot.title = element_text(face = "bold", size = 16),
         axis.title = element_text(face = "bold")
       )
+  })
+  
+  # Word Cloud (titles + descriptions)
+  output$wordcloud <- wordcloud2::renderWordcloud2({
+    df <- get_data()
+    if (nrow(df) == 0) {
+      return(wordcloud2::wordcloud2(data.frame(word = "No Data", n = 1)))
+    }
+    
+    # Combine title + description
+    wc_data <- df %>%
+      dplyr::select(title, description) %>%
+      tidyr::unite("text", title, description, sep = " ", remove = TRUE) %>%
+      dplyr::filter(!is.na(text)) %>%
+      tidytext::unnest_tokens(word, text) %>%
+      anti_join(tidytext::stop_words, by = "word") %>%
+      dplyr::filter(!grepl("^[0-9]+$", word)) %>%
+      dplyr::count(word, sort = TRUE)
+    
+    if (nrow(wc_data) == 0) {
+      wc_data <- data.frame(word = "No Words", n = 1)
+    }
+    
+    wordcloud2::wordcloud2(wc_data)
   })
   
   # Top Sources Plot
