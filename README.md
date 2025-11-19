@@ -1,2 +1,50 @@
-# currents-news-reporting
-Use Currents News API to extract information about Current and Past News
+# 📰 Currents News Reporting - Data Engineering Project
+
+## Overview
+This project builds an **end-to-end data pipeline** using **Apache Airflow** and **Docker**.  
+It fetches live news from the [Currents API](https://currentsapi.services/en), stores it in a database,  
+and performs automated analysis to identify top sources and trends.
+
+Developed for **Northwestern University - Fall 2025 Data Engineering Final Project**.
+
+---
+
+## 🧠 Project Objectives
+- Read data from an API (Currents API)
+- Store the API data in a database
+- Build a DAG to orchestrate the pipeline using Apache Airflow
+- Automate tasks and measure pipeline performance
+- Perform exploratory data analysis (EDA) on the news dataset
+
+---
+
+## 📦 File Structure
+
+```
+currents-news-reporting/
+├── dags/
+│ └── news_pipeline_dag.py # Airflow DAG script
+├── src/
+│ ├── news_api_utils.py # API connection and data fetching functions
+│ ├── db_utils.py # Database helper functions
+│ ├── analysis_utils.py # Simple EDA functions
+│ └── init.py
+├── docker-compose.yaml # Docker configuration for Airflow
+├── requirements.txt # Python dependencies
+├── .env.example # Environment variable template (no real API key)
+├── .gitignore # Files to ignore in Git
+└── README.md # Project documentation
+```
+
+git clone the repo
+in currents-news-reporting directory
+run
+```bash
+docker build -t api_db-app -f src/python_app/Dockerfile . 
+
+docker run --rm -v ${PWD}:/workspace -w /workspace -e API_KEY=<"YOUR_API_KEY"> -e START_DATE=<"YYYY-MM-DD"> -e END_DATE=<"YYYY-MM-DD"> -e KEYWORD=<"YOUR_KEYWORD"> -e CSV_NAME=<"YOUR_CSV_NAME"> api_db-app python src/python_app/main.py
+```
+Example:
+```
+docker run --rm -v ${PWD}:/workspace -w /workspace -e API_KEY="aASJnEH97362DS" -e START_DATE="2025-08-04" -e END_DATE="2025-08-05" -e KEYWORD="world" -e CSV_NAME="latest.csv" api_db-app python src/python_app/main.py
+```

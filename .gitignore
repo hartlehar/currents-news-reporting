@@ -1,3 +1,36 @@
-.venv
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite
+*.csv
+*.log
+
+# --- Virtual environments ---
+venv/
 .env
+.env.local
+*.env
+.venv
+
+# --- Airflow ---
+logs/
+airflow_logs/
+dags/__pycache__/
+plugins/__pycache__/
+
+# --- Docker ---
+*.pid
+*.sock
+tmp/
+postgres-data/
+*.tar
+
+# --- OS & IDE files ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
 data
