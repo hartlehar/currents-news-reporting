@@ -13,6 +13,7 @@ venv/
 .env
 .env.local
 *.env
+.venv
 
 # --- Airflow ---
 logs/
@@ -32,3 +33,4 @@ postgres-data/
 Thumbs.db
 .idea/
 .vscode/
+data

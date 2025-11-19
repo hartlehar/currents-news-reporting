@@ -8,6 +8,8 @@ library(ggplot2)
 library(DT)
 library(lubridate)
 library(wordcloud2)
+library(tidytext)
+library(tidyr)
 
 # Connect to SQLite database
 con <- dbConnect(SQLite(), "data/news.db")
@@ -110,7 +112,7 @@ server <- function(input, output, session) {
     df %>%
       count(published) %>%
       ggplot(aes(x = published, y = n)) +
-      geom_line(color = "#0d6efd", size = 1.2) +
+      geom_line(color = "#0d6efd", linewidth = 1.2) +
       geom_point(color = "#198754", size = 2) +
       labs(x = "Date", y = "Count") +
       theme_minimal(base_size = 14) +
@@ -217,4 +219,4 @@ server <- function(input, output, session) {
 }
 
 # Run the app
-# shinyApp(ui, server)
+shinyApp(ui, server)
