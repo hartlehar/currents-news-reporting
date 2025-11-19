@@ -8,7 +8,6 @@ WORKDIR /R_app
 
 COPY src/R_app/ .
 COPY data/ /R_app/data
-#COPY ../../data ./data
 
 # Install R packages
 RUN Rscript install_packages.R
