@@ -16,12 +16,9 @@ build/
 # Virtual Environments
 # ==========================
 .env
-.env/
-venv/
-venv*/
-ENV/
-env/
-.venv/
+.env.local
+.venv
+venv
 
 # ==========================
 # Jupyter Notebook
@@ -93,3 +90,4 @@ docker-compose.override.yml
 *.tmp
 *.bak
 *.swp
+.vscode/
