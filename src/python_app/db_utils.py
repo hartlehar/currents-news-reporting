@@ -1,5 +1,5 @@
 import re
-import psycopg2
+import sqlite3
 import pandas as pd
 from pathlib import Path
 
@@ -163,7 +163,7 @@ def main(data_folder="data", db_path="data/news.db"):
     df_full = pd.read_csv(latest_csv)
 
     # Connect to SQLite
-    conn = psycopg2.connect(db_path)
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     print("🛠️ Creating database tables...")
