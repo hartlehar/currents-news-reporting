@@ -35,3 +35,16 @@ currents-news-reporting/
 ├── .gitignore # Files to ignore in Git
 └── README.md # Project documentation
 ```
+
+git clone the repo
+in currents-news-reporting directory
+run
+```bash
+docker build -t api_db-app -f src/python_app/Dockerfile . 
+
+docker run --rm -v ${PWD}:/workspace -w /workspace -e API_KEY=<"YOUR_API_KEY"> -e START_DATE=<"YYYY-MM-DD"> -e END_DATE=<"YYYY-MM-DD"> -e KEYWORD=<"YOUR_KEYWORD"> -e CSV_NAME=<"YOUR_CSV_NAME"> api_db-app python src/python_app/main.py
+```
+Example:
+```
+docker run --rm -v ${PWD}:/workspace -w /workspace -e API_KEY="aASJnEH97362DS" -e START_DATE="2025-08-04" -e END_DATE="2025-08-05" -e KEYWORD="world" -e CSV_NAME="latest.csv" api_db-app python src/python_app/main.py
+```
