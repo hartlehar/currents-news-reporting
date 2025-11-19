@@ -21,20 +21,37 @@ Developed for **Northwestern University - Fall 2025 Data Engineering Final Proje
 
 ```
 currents-news-reporting/
-├── dags/
-│ └── news_pipeline_dag.py # Airflow DAG script
+│
+currents-news-reporting/
+├── docker-compose.yml        # Docker 编排
+├── Dockerfile                # Airflow 镜像
+├── Dockerfile.shiny          # Shiny 镜像
+├── requirements.txt          # Python 依赖
+├── .env.example              # 环境变量模板
+├── .gitignore                # Git 忽略
+├── README.md                 # 本文件
+│
+├── airflow/
+│   └── dags/
+│       └── news_pipeline_dag.py
+│
 ├── src/
-│ ├── news_api_utils.py # API connection and data fetching functions
-│ ├── db_utils.py # Database helper functions
-│ ├── analysis_utils.py # Simple EDA functions
-│ └── init.py
-├── docker-compose.yaml # Docker configuration for Airflow
-├── requirements.txt # Python dependencies
-├── .env.example # Environment variable template (no real API key)
-├── .gitignore # Files to ignore in Git
-└── README.md # Project documentation
+│   ├── __init__.py
+│   ├── news_api_utils.py
+│   └── db_to_postgres.py
+│
+├── shiny/
+│   └── app.R
+│
+├── data/
+│   ├── csv/
+│   └── logs/
+│
+└── logs/
+    └── (airflow logs)
 ```
 
+<<<<<<< Updated upstream
 ## System Architecture
 ```
             ┌──────────────┐
@@ -59,3 +76,28 @@ currents-news-reporting/
       └──────────────────────────┘
 ```
 =======
+=======
+http://127.0.0.1:8080
+
+
+# 构建镜像
+docker-compose build
+
+# 启动容器
+docker-compose up -d
+
+# 查看状态
+docker-compose ps
+
+# 初始化 Airflow 数据库
+docker-compose exec airflow-webserver airflow db init
+
+# 创建管理员用户
+docker-compose exec airflow-webserver airflow users create \
+    --username admin \
+    --password admin \
+    --firstname Admin \
+    --lastname User \
+    --role Admin \
+    --email admin@example.com
+>>>>>>> Stashed changes
