@@ -12,6 +12,10 @@ library(wordcloud2)
 # Connect to SQLite database
 con <- dbConnect(SQLite(), "data/news.db")
 
+onStop(function() {
+  dbDisconnect(con)
+})
+
 # Preload dropdown options
 categories <- dbGetQuery(con, "SELECT category FROM NewsCategory ORDER BY category")$category
 sources <- dbGetQuery(con, "SELECT source FROM NewsSource ORDER BY source")$source
@@ -213,7 +217,4 @@ server <- function(input, output, session) {
 }
 
 # Run the app
-shinyApp(ui, server)
-
-# Disconnect connection once finished
-dbDisconnect(con)
+# shinyApp(ui, server)

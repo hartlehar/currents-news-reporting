@@ -1,6 +1,5 @@
-import os
 import re
-import sqlite3
+import psycopg2
 import pandas as pd
 from pathlib import Path
 
@@ -151,23 +150,20 @@ def load_source_table(cursor, df_full):
 # ------------------------------------------------------------------------------
 #  Main Process
 # ------------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    print("🔍 Looking for latest CSV in /data/...")
-
-    latest_csv = get_latest_csv("data")
+def main(data_folder="data", db_path="data/news.db"):
+    print("🔍 Looking for latest CSV in /data/ ...")
+    latest_csv = get_latest_csv(data_folder)
     print(f"📄 Latest CSV detected: {latest_csv}")
 
-    # Basic cleaned dataframe
-    df = pd.read_csv(latest_csv)
-    df = df.drop(columns=["category", "url"], errors="ignore")
+    # Load cleaned dataframe for main table
+    df = pd.read_csv(latest_csv).drop(columns=["category", "url"], errors="ignore")
     df["published"] = pd.to_datetime(df["published"], errors="coerce").dt.date
 
-    # Full version for category & url processing
+    # Full dataframe for category and url processing
     df_full = pd.read_csv(latest_csv)
 
-    # Connect to SQLite database
-    conn = sqlite3.connect("data/news.db")
+    # Connect to SQLite
+    conn = psycopg2.connect(db_path)
     cursor = conn.cursor()
 
     print("🛠️ Creating database tables...")
@@ -180,3 +176,6 @@ if __name__ == "__main__":
     conn.close()
 
     print("✅ Database successfully built from latest CSV!")
+
+if __name__ == "__main__":
+    main()

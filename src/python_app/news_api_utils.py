@@ -1,8 +1,6 @@
 import os
-import json
 import requests
 import pandas as pd
-# from dotenv import load_dotenv
 
 def get_news_search(key, start_date=None, end_date=None, keyword=None, region=None, size=200, page=None):
     """
@@ -73,22 +71,21 @@ def fetch_news_to_csv(api_key, start, end, keyword, output_csv):
 
     print(f"\n✅ CSV saved successfully to: {output_path}")
 
+def main(api_key, start, end, keyword, output_name):
+    """
+    Wrapper to fetch news CSV, callable from other scripts.
+    """
+    return fetch_news_to_csv(api_key, start, end, keyword, output_name)
+
 
 if __name__ == "__main__":
-
     API_KEY = input("Please enter your API key: ").strip()
     start = input("Please enter your start date in YYYY-MM-DD format: ").strip()
     end = input("Please enter your end date in YYYY-MM-DD format: ").strip()
     output_name = input("Please enter your output csv file name (must end in .csv): ").strip()
     keyword = input("Please enter your keyword: ").strip()
 
-    # Call the main function with user-provided arguments
-    fetch_news_to_csv(
-        api_key = API_KEY,
-        start = start,
-        end = end,
-        keyword = keyword,
-        output_csv = output_name
-    )
+    main(API_KEY, start, end, keyword, output_name)
 
-    print(f"✔ Download completed. CSV saved as: {output_name}")
+
+    
