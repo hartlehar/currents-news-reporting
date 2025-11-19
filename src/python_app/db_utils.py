@@ -2,6 +2,7 @@ import re
 import sqlite3
 import pandas as pd
 from pathlib import Path
+import ast
 
 
 # ------------------------------------------------------------------------------
@@ -39,15 +40,17 @@ def load_main_table(cursor, df):
             title TEXT,
             description TEXT,
             author TEXT,
+            source_id INTEGER,
+            url TEXT,
             image TEXT,
             language TEXT,
-            category TEXT,
-            published DATE
+            published DATE,
+            FOREIGN KEY (source_id) REFERENCES NewsSource(id)
         )
     """)
 
     # Insert data
-    df.to_sql("NewsArticles", cursor.connection, if_exists="replace", index=False)
+    df.to_sql("NewsArticles", cursor.connection, if_exists="append", index=False)
 
 
 # ------------------------------------------------------------------------------
@@ -62,39 +65,41 @@ def load_category_table(cursor, df_full):
 
     df = df_full.copy()
 
-    # Clean categories
-    df["category"] = (
-        df["category"]
-        .fillna("")
-        .replace(r"[\[\]']", "", regex=True)
-        .str.split(r"\s*,\s*")
-    )
-
-    df = df.explode("category", ignore_index=True)
-
-    df = df.rename(columns={"id": "news_id"})
-    df = df[["news_id", "category"]]
-
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS NewsCategory (
-            category_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            news_id TEXT NOT NULL,
-            category TEXT,
-            FOREIGN KEY (news_id) REFERENCES NewsArticles(id)
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT
         )
     """)
 
-    # Temp table
-    df.to_sql("TempCategory", cursor.connection, if_exists="replace", index=False)
+    df["category"] = df["category"].apply(ast.literal_eval)
+    unique_cats = set().union(*df["category"])
+
+    for cat in unique_cats:
+        cursor.execute("INSERT INTO NewsCategory (category) VALUES (?);", (cat.strip(),))
+
 
     cursor.execute("""
-        INSERT INTO NewsCategory (news_id, category)
-        SELECT news_id, category
-        FROM TempCategory
-        WHERE category IS NOT NULL AND TRIM(category) != '';
+        CREATE TABLE IF NOT EXISTS NewsArticleCategory (
+            news_id TEXT,
+            category_id INTEGER,
+            FOREIGN KEY (news_id) REFERENCES NewsArticles(id),
+            FOREIGN KEY (category_id) REFERENCES NewsCategory(id)
+        )
     """)
 
-    cursor.execute("DROP TABLE IF EXISTS TempCategory;")
+    for _, row in df.iterrows():
+        news_id = row["id"]
+        categories = row["category"]
+
+        for cat in categories:
+            cursor.execute("SELECT id FROM NewsCategory WHERE category = ?;", (cat.strip(),))
+            cat_id = cursor.fetchone()
+            if cat_id:
+                cursor.execute("""
+                    INSERT INTO NewsArticleCategory (news_id, category_id)
+                    VALUES (?, ?);
+                """, (news_id, cat_id[0]))
 
 
 # ------------------------------------------------------------------------------
@@ -128,23 +133,27 @@ def load_source_table(cursor, df_full):
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS NewsSource (
-            source_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            news_id TEXT NOT NULL,
-            source TEXT NOT NULL,
-            FOREIGN KEY (news_id) REFERENCES NewsArticles(id)
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source TEXT NOT NULL
         )
     """)
 
-    df_source.to_sql("TempSource", cursor.connection, if_exists="replace", index=False)
+    for source in df_source["source"].unique():
+        cursor.execute("INSERT INTO NewsSource (source) VALUES (?);", (source,))
 
-    cursor.execute("""
-        INSERT INTO NewsSource (news_id, source)
-        SELECT news_id, source
-        FROM TempSource
-        WHERE source IS NOT NULL AND TRIM(source) != '';
-    """)
+    # Update NewsArticles with source_id
+    for _, row in df_source.iterrows():
+        news_id = row["news_id"]
+        source = row["source"]
 
-    cursor.execute("DROP TABLE IF EXISTS TempSource;")
+        cursor.execute("SELECT id FROM NewsSource WHERE source = ?;", (source,))
+        source_id = cursor.fetchone()
+        if source_id:
+            cursor.execute("""
+                UPDATE NewsArticles
+                SET source_id = ?
+                WHERE id = ?;
+            """, (source_id[0], news_id))
 
 
 # ------------------------------------------------------------------------------
