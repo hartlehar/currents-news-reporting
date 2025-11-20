@@ -1,419 +1,519 @@
-# 📰 Currents News Reporting - Airflow News Data Pipeline
+# 📰 Currents News Reporting - Data Engineering Pipeline
 
-A complete data engineering project that fetches news data from Currents API using Apache Airflow and stores it in PostgreSQL.
+**MLDS 400 Final Project**
+
+A complete data engineering workflow for news data: **Currents API → Airflow ETL → CSV → PostgreSQL + SQLite → Shiny Dashboard**
+
+All services containerized with Docker Compose.
+
+---
 
 ## 🎯 Project Overview
 
-- **Data Source**: [Currents API](https://currentsapi.services/)
-- **Data Processing**: Apache Airflow ETL tasks scheduling
-- **Data Storage**: PostgreSQL database
-- **Deployment**: Docker Compose containerization
+This project demonstrates a full data pipeline:
+
+1. **Data Collection:** Fetch news articles from Currents API
+2. **ETL Processing:** Apache Airflow orchestrates data pipeline with 3 tasks
+3. **Data Storage:** Store in both PostgreSQL (analytical) and SQLite (dashboard)
+4. **Data Visualization:** Interactive Shiny dashboard for exploring news data
+
+**Key Technologies:**
+- Apache Airflow (orchestration)
+- PostgreSQL (relational database)
+- SQLite (lightweight database)
+- Shiny (interactive dashboard)
+- Docker (containerization)
+
+---
 
 ## 📁 Project Structure
 
 ```
 currents-news-reporting/
-├── docker-compose.yml          # Docker orchestration file
-├── Dockerfile                  # Airflow image configuration
+├── docker-compose.yml          # Docker orchestration
+├── Dockerfile                  # Airflow image
 ├── requirements.txt            # Python dependencies
-├── .env.example               # Environment variables template
-├── .gitignore                 # Git ignore rules
-├── README.md                  # Project documentation
+├── .env.example               # Environment template
+├── README.md                  # This file
 │
 ├── airflow/
 │   └── dags/
-│       └── news_pipeline_dag.py    # Airflow DAG definition
+│       └── news_pipeline_dag.py    # Main ETL DAG (3 tasks)
 │
 ├── src/
-│   ├── __init__.py                 # Python package init
-│   ├── news_api_utils.py           # API call functions
-│   └── db_to_postgres.py           # Database loading functions
+│   ├── __init__.py
+│   ├── news_api_utils.py           # Currents API integration
+│   ├── db_to_postgres.py           # PostgreSQL ETL
+│   └── db_utils.py                 # SQLite conversion
 │
-├── data/
-│   ├── csv/                    # CSV file storage
-│   └── logs/                   # Log files
+├── R_app/
+│   ├── app.R                       # Shiny dashboard
+│   ├── Dockerfile.shine            # Shiny image
+│   └── install_packages.R          # R dependencies
 │
-└── logs/
-    └── (Airflow logs)
+└── data/
+    ├── news_output.csv             # Generated CSV (645+ articles)
+    ├── news.db                     # SQLite database (Shiny uses)
+    └── logs/                       # Processing logs
 ```
+
+---
 
 ## 🚀 Quick Start
 
-### Prerequisites
-
-- Docker and Docker Compose installed
-- Valid Currents API Key (free registration at https://currentsapi.services/)
-
-### Step 1: Environment Configuration
+### 1. Configure Environment
 
 ```bash
-# Copy environment variables template
 cp .env.example .env
-
-# Edit .env and add your API Key
-nano .env
+# Edit .env with your API key:
+# CURRENTS_API_KEY=your_api_key_here
 ```
 
-**Key Configuration Items:**
-```
+**Required Variables:**
+```env
+CURRENTS_API_KEY=your_key_here          # Get from https://currentsapi.services/
 POSTGRES_USER=airflow
 POSTGRES_PASSWORD=airflow
 POSTGRES_DB=airflow
-CURRENTS_API_KEY=your_real_api_key_here  # Required!
 ```
 
-### Step 2: Start Services
+### 2. Start Services
 
 ```bash
-# Build images and start containers
 docker-compose up -d
-
-# Wait 30 seconds for services to start
 sleep 30
-
-# Check container status
 docker-compose ps
 ```
 
-**Expected Output:**
+**Expected Status:**
 ```
-NAME                  STATUS
-airflow-postgres      Healthy
-airflow-redis         Healthy
-airflow-webserver     Up
-airflow-scheduler     Up
-airflow-worker        Up
+airflow-postgres    Healthy
+airflow-webserver   Up
+airflow-scheduler   Up
 ```
 
-### Step 3: Initialize Airflow
+### 3. Initialize Airflow
 
 ```bash
-# Initialize Airflow database
 docker-compose exec -T airflow-webserver airflow db init
 
-# Create admin user
 docker-compose exec -T airflow-webserver airflow users create \
-    --username admin \
-    --password admin \
-    --firstname Admin \
-    --lastname User \
-    --role Admin \
-    --email admin@example.com
+  --username admin \
+  --password admin \
+  --firstname Admin \
+  --lastname User \
+  --role Admin \
+  --email admin@example.com
 ```
 
-### Step 4: Access Airflow UI
+### 4. Access Airflow
 
-Open your browser:
-
-```
-http://127.0.0.1:8080
-```
-
-**Login Credentials:**
+🔗 **http://localhost:8080**
 - Username: `admin`
 - Password: `admin`
 
-## 📊 Running the DAG
-
-### Trigger via UI
-
-1. Visit http://127.0.0.1:8080
-2. Click "DAGs" in the left menu
-3. Find `news_pipeline` DAG
-4. Click the three-dot menu and select "Trigger DAG"
-5. Confirm by clicking "Trigger"
-
-### Trigger via Command Line
+### 5. Start Shiny Dashboard
 
 ```bash
-# Trigger DAG run
-docker-compose exec -T airflow-webserver airflow dags trigger news_pipeline
-
-# View Scheduler logs
-docker-compose logs -f airflow-scheduler
-
-# View Worker logs
-docker-compose logs -f airflow-worker
+docker build -t news-shiny -f R_app/Dockerfile.shine .
+docker run -p 3838:3838 -v $(pwd)/data:/data news-shiny
 ```
 
-## 🗄️ Verify Data
+🔗 **http://localhost:3838**
 
-After the DAG completes, check if data was successfully stored:
+---
 
-```bash
-# Enter PostgreSQL
-docker-compose exec postgres psql -U airflow -d airflow
+## 🔄 Airflow DAG Operations
 
-# View all tables
-\dt
-
-# Check number of news articles
-SELECT COUNT(*) FROM newsarticles;
-
-# View first 5 news articles
-SELECT id, title, published FROM newsarticles LIMIT 5;
-
-# View news sources statistics
-SELECT source, COUNT(*) as count FROM newssource GROUP BY source ORDER BY count DESC;
-
-# View news categories statistics
-SELECT category, COUNT(*) as count FROM newscategory GROUP BY category ORDER BY count DESC;
-
-# Exit PostgreSQL
-\q
-```
-
-## 📝 DAG Explanation
-
-### DAG: news_pipeline
-
-**Schedule**: Daily at 00:00 UTC  
-**Task Flow**: `fetch_news` → `load_postgres`
-
-#### Task 1: fetch_news
-- Fetches news from Currents API for specified date range
-- Saves data as CSV file to `/opt/airflow/data/`
-
-#### Task 2: load_postgres
-- Reads CSV file
-- Creates or updates database tables
-- Loads data into PostgreSQL
-
-**Configurable Parameters** (edit in `airflow/dags/news_pipeline_dag.py`):
-```python
-start="2024-01-01"      # Start date
-end="2024-01-10"        # End date
-keyword="technology"    # Search keyword
-```
-
-## 🔧 Common Commands
-
-### Container Management
-
-```bash
-# View all containers
-docker-compose ps
-
-# View detailed logs
-docker-compose logs -f
-
-# View specific service logs
-docker-compose logs -f airflow-webserver
-docker-compose logs -f airflow-scheduler
-docker-compose logs -f airflow-worker
-
-# Restart services
-docker-compose restart
-
-# Stop services (preserve data)
-docker-compose stop
-
-# Stop and remove containers (preserve data)
-docker-compose down
-
-# Complete cleanup (WARNING: deletes database data!)
-docker-compose down -v
-```
-
-### Airflow Commands
+### View DAGs
 
 ```bash
 # List all DAGs
 docker-compose exec -T airflow-webserver airflow dags list
 
-# List tasks in a DAG
-docker-compose exec -T airflow-webserver airflow tasks list news_pipeline
-
-# Get DAG information
+# Get DAG details
 docker-compose exec -T airflow-webserver airflow dags info news_pipeline
 
-# Enter Airflow container bash
-docker-compose exec airflow-webserver bash
-
-# Test a specific task
-docker-compose exec -T airflow-webserver airflow tasks test news_pipeline fetch_news 2024-01-01
+# List tasks in DAG
+docker-compose exec -T airflow-webserver airflow tasks list news_pipeline
 ```
 
-### PostgreSQL Operations
+### Trigger DAG
+
+**Via Web UI:**
+1. Go to http://localhost:8080
+2. Find "news_pipeline" DAG
+3. Click play button or "Trigger DAG"
+
+**Via CLI:**
+```bash
+# Simple trigger
+docker-compose exec -T airflow-webserver airflow dags trigger news_pipeline
+
+# With execution date
+docker-compose exec -T airflow-webserver \
+  airflow dags trigger news_pipeline --exec-date 2025-11-19
+
+# With configuration
+docker-compose exec -T airflow-webserver \
+  airflow dags trigger news_pipeline \
+  --conf '{"keyword":"technology"}'
+```
+
+### Monitor Execution
 
 ```bash
-# Enter PostgreSQL interactive client
-docker-compose exec postgres psql -U airflow -d airflow
+# Watch scheduler logs
+docker-compose logs -f airflow-scheduler
 
-# Execute SQL query without interactive mode
-docker-compose exec -T postgres psql -U airflow -d airflow -c "SELECT COUNT(*) FROM newsarticles;"
+# Filter by DAG
+docker-compose logs airflow-scheduler | grep news_pipeline
 
-# Export data as CSV
-docker-compose exec -T postgres psql -U airflow -d airflow -c \
-  "COPY (SELECT * FROM newsarticles) TO STDOUT WITH CSV HEADER;" > export.csv
+# Filter by task
+docker-compose logs airflow-scheduler | grep csv_to_sqlite
+
+# Last 50 lines
+docker-compose logs -f airflow-scheduler --tail 50
 ```
+
+### Test Tasks
+
+```bash
+# Test single task (dry run)
+docker-compose exec -T airflow-webserver \
+  airflow tasks test news_pipeline fetch_news 2025-11-19
+
+# Test all tasks in DAG
+docker-compose exec -T airflow-webserver \
+  airflow dags test news_pipeline 2025-11-19
+```
+
+### Manage DAG
+
+```bash
+# Pause DAG (stop scheduling)
+docker-compose exec -T airflow-webserver airflow dags pause news_pipeline
+
+# Unpause DAG (resume scheduling)
+docker-compose exec -T airflow-webserver airflow dags unpause news_pipeline
+
+# Clear task instances (allow re-run)
+docker-compose exec -T airflow-webserver \
+  airflow tasks clear news_pipeline -t csv_to_sqlite
+
+# Clear all tasks
+docker-compose exec -T airflow-webserver \
+  airflow tasks clear news_pipeline
+```
+
+### Set Variables
+
+```bash
+# Via CLI
+docker-compose exec -T airflow-webserver \
+  airflow variables set news_keyword "python"
+
+# Get variable
+docker-compose exec -T airflow-webserver \
+  airflow variables get news_keyword
+```
+
+**Or via Web UI:**
+1. Admin → Variables
+2. Click + (create)
+3. Key: `news_keyword`
+4. Value: `python`
+5. Save
+
+### Enter Container Shell
+
+```bash
+# SSH into webserver
+docker-compose exec airflow-webserver bash
+
+# Check API key loaded
+docker-compose exec -T airflow-webserver \
+  printenv | grep CURRENTS_API_KEY
+
+# View DAG file
+docker-compose exec -T airflow-webserver \
+  cat airflow/dags/news_pipeline_dag.py
+
+# Check data directory
+docker-compose exec -T airflow-webserver \
+  ls -lh /opt/airflow/data/
+```
+
+---
+
+## 📊 DAG Tasks (Pipeline Flow)
+
+```
+fetch_news → load_postgres → csv_to_sqlite
+```
+
+### Task 1: fetch_news (API → CSV)
+- Calls Currents API for news articles
+- Saves to `/opt/airflow/data/news_output.csv`
+- Time: ~2 minutes
+- Retries: 2
+
+### Task 2: load_postgres (CSV → PostgreSQL)
+- Reads CSV file
+- Creates/updates PostgreSQL tables
+- Time: ~1 minute
+- Retries: 1
+- Note: Failure doesn't interrupt pipeline
+
+### Task 3: csv_to_sqlite (CSV → SQLite)
+- Converts CSV to SQLite database
+- Generates `/data/news.db` (used by Shiny)
+- Time: ~30 seconds
+- Retries: 1
+
+---
+
+## 🗄️ PostgreSQL Operations
+
+### Access Database
+
+```bash
+# Enter PostgreSQL
+docker-compose exec postgres psql -U airflow -d airflow
+```
+
+### Query Data
+
+```bash
+# Inside psql:
+SELECT COUNT(*) FROM newsarticles;
+SELECT * FROM newsarticles LIMIT 5;
+SELECT category, COUNT(*) FROM newscategory GROUP BY category;
+SELECT source, COUNT(*) FROM newssource GROUP BY source;
+\q  # Exit
+
+# Or execute directly
+docker-compose exec -T postgres \
+  psql -U airflow -d airflow \
+  -c "SELECT COUNT(*) FROM newsarticles;"
+```
+
+### Backup Database
+
+```bash
+# Backup to SQL file
+docker-compose exec -T postgres \
+  pg_dump -U airflow airflow > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Export to CSV
+docker-compose exec -T postgres \
+  psql -U airflow -d airflow \
+  -c "COPY newsarticles TO STDOUT WITH CSV HEADER;" > articles.csv
+```
+
+---
+
+## 📊 Data Verification
+
+```bash
+# Check CSV
+ls -lh data/news_output.csv
+wc -l data/news_output.csv
+
+# Check SQLite
+ls -lh data/news.db
+
+# SQLite row count
+docker-compose exec -T airflow-webserver \
+  sqlite3 data/news.db "SELECT COUNT(*) FROM NewsArticles;"
+
+# PostgreSQL row count
+docker-compose exec -T postgres \
+  psql -U airflow -d airflow -c "SELECT COUNT(*) FROM newsarticles;"
+
+# View recent articles
+docker-compose exec -T airflow-webserver \
+  sqlite3 data/news.db \
+  "SELECT title, published FROM NewsArticles ORDER BY published DESC LIMIT 5;"
+```
+
+---
+
+## 🔧 Docker Commands
+
+```bash
+# View container status
+docker-compose ps
+
+# View all logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f airflow-scheduler
+docker-compose logs -f airflow-webserver
+docker-compose logs -f postgres
+
+# Restart services
+docker-compose restart
+docker-compose restart airflow-scheduler
+
+# Stop services (keep data)
+docker-compose stop
+
+# Stop and remove (keep data)
+docker-compose down
+
+# Full cleanup (delete everything!)
+docker-compose down -v
+```
+
+---
 
 ## 🐛 Troubleshooting
 
-### Issue 1: Cannot Access Airflow UI
+### DAG Not Showing?
 
 ```bash
-# Check if webserver container is running
-docker-compose ps | grep webserver
-
-# View webserver logs
-docker-compose logs airflow-webserver | tail -50
-
-# Restart webserver
-docker-compose restart airflow-webserver
-
-# Wait 15 seconds and retry
-sleep 15
-```
-
-### Issue 2: DAG Import Error
-
-```bash
-# Ensure src/__init__.py exists
-touch src/__init__.py
+# Check Python syntax
+docker-compose exec -T airflow-webserver \
+  python3 -m py_compile airflow/dags/news_pipeline_dag.py
 
 # Restart scheduler
 docker-compose restart airflow-scheduler
-
-# Wait 30 seconds
 sleep 30
 ```
 
-### Issue 3: Task Execution Failure
+### Task Failed?
 
 ```bash
-# View detailed error logs
-docker-compose logs airflow-worker | tail -100
+# Check logs
+docker-compose logs airflow-scheduler | grep ERROR
 
-# Or check logs in Airflow UI by clicking on the task
+# Re-run task
+docker-compose exec -T airflow-webserver \
+  airflow tasks clear news_pipeline -t csv_to_sqlite
 ```
 
-### Issue 4: PostgreSQL Connection Error
+### API Key Missing?
 
 ```bash
-# Check postgres container status
-docker-compose exec postgres pg_isready
+# Verify .env
+cat .env | grep CURRENTS_API_KEY
 
-# View postgres logs
-docker-compose logs postgres
+# Check in container
+docker-compose exec -T airflow-webserver \
+  printenv | grep CURRENTS_API_KEY
 
-# Restart postgres
+# Restart to reload
+docker-compose restart airflow-webserver airflow-scheduler
+```
+
+### PostgreSQL Error?
+
+```bash
+# Test connection
+docker-compose exec -T postgres pg_isready
+
+# Restart
 docker-compose restart postgres
-
-# Wait 10 seconds
 sleep 10
 ```
 
-### Issue 5: API Key Error
+---
+
+## 📋 Database Schema
+
+### newsarticles
+```sql
+id TEXT PRIMARY KEY
+title TEXT
+description TEXT
+author TEXT
+image TEXT
+language TEXT
+published DATE
+```
+
+### newscategory
+```sql
+id SERIAL PRIMARY KEY
+news_id TEXT REFERENCES newsarticles(id)
+category TEXT
+```
+
+### newssource
+```sql
+id SERIAL PRIMARY KEY
+news_id TEXT REFERENCES newsarticles(id)
+source TEXT
+```
+
+---
+
+## 🎯 Typical Workflow
 
 ```bash
-# Verify environment variables are passed correctly
-docker-compose exec -T airflow-webserver printenv | grep CURRENTS_API_KEY
+# 1. Start everything
+docker-compose up -d && sleep 30
 
-# Should show: CURRENTS_API_KEY=your_actual_api_key
+# 2. Check status
+docker-compose ps
 
-# If empty, check .env file
-cat .env | grep CURRENTS_API_KEY
+# 3. Trigger DAG
+docker-compose exec -T airflow-webserver airflow dags trigger news_pipeline
 
-# Update .env and restart containers
-docker-compose restart
+# 4. Watch logs
+docker-compose logs -f airflow-scheduler
+
+# 5. Verify data
+docker-compose exec -T airflow-webserver \
+  sqlite3 data/news.db "SELECT COUNT(*) FROM NewsArticles;"
+
+# 6. Start Shiny (another terminal)
+docker build -t news-shiny -f R_app/Dockerfile.shine .
+docker run -p 3838:3838 -v $(pwd)/data:/data news-shiny
+
+# 7. Access dashboards
+# Airflow: http://localhost:8080
+# Shiny: http://localhost:3838
 ```
 
-## 📊 Database Schema
+---
 
-### newsarticles Table
-Stores main news article information
+## 📝 Quick Reference
 
-```sql
-CREATE TABLE newsarticles (
-    id TEXT PRIMARY KEY,           -- Article ID
-    title TEXT,                    -- Title
-    description TEXT,              -- Description
-    author TEXT,                   -- Author
-    image TEXT,                    -- Image URL
-    language TEXT,                 -- Language
-    published DATE                 -- Publication date
-);
-```
+| Task | Command |
+|------|---------|
+| List DAGs | `airflow dags list` |
+| Trigger DAG | `airflow dags trigger news_pipeline` |
+| View logs | `docker-compose logs -f airflow-scheduler` |
+| Test task | `airflow tasks test news_pipeline fetch_news 2025-11-19` |
+| Clear task | `airflow tasks clear news_pipeline -t csv_to_sqlite` |
+| Pause DAG | `airflow dags pause news_pipeline` |
+| Unpause DAG | `airflow dags unpause news_pipeline` |
+| Enter psql | `psql -U airflow -d airflow` |
 
-### newscategory Table
-Article categories (many-to-many relationship)
+---
 
-```sql
-CREATE TABLE newscategory (
-    id SERIAL PRIMARY KEY,
-    news_id TEXT REFERENCES newsarticles(id),
-    category TEXT                  -- Category tag
-);
-```
+## 🔗 Links
 
-### newssource Table
-News sources (many-to-many relationship)
+- **Currents API:** https://currentsapi.services/
+- **Airflow Docs:** https://airflow.apache.org/docs/
+- **PostgreSQL Docs:** https://www.postgresql.org/docs/
 
-```sql
-CREATE TABLE newssource (
-    id SERIAL PRIMARY KEY,
-    news_id TEXT REFERENCES newsarticles(id),
-    source TEXT                    -- Source website domain
-);
-```
+---
 
-## 🔄 Modifying the DAG
+## 📚 What You Learn
 
-To modify DAG parameters or logic:
+This project covers:
+- ✅ ETL pipeline design
+- ✅ Airflow orchestration
+- ✅ Docker containerization
+- ✅ PostgreSQL database operations
+- ✅ Data visualization with Shiny
+- ✅ API integration
+- ✅ Data processing and transformation
 
-1. **Edit file**: `airflow/dags/news_pipeline_dag.py`
-2. **Save file**: Scheduler automatically detects changes within 30 seconds
-3. **No restart needed**: DAG automatically reloads
+---
 
-When modifying source code in `src/` directory:
-
-1. **Edit file**: Modify `src/news_api_utils.py` or `src/db_to_postgres.py`
-2. **Save file**: Changes loaded automatically in container
-3. **Re-run DAG**: Next execution uses new code
-
-## 📈 Extension Ideas
-
-### Add More Data Sources
-Create new API call functions in `src/` and add new tasks to DAG
-
-### Add Data Validation
-Add data quality checks before loading to PostgreSQL
-
-### Add Notifications
-Configure Airflow email alerts for task failures
-
-### Add Visualization
-Integrate Superset or Grafana for data visualization
-
-## 📚 References
-
-- [Apache Airflow Documentation](https://airflow.apache.org/)
-- [Currents API Documentation](https://currentsapi.services/docs)
-- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
-
-## 📝 License
-
-MIT License
-
-## 👨‍💻 Contributing
-
-Issues and pull requests are welcome!
-
-## ⚠️ Important Notes
-
-- **Production**: Change PostgreSQL password to a strong one
-- **Data Backup**: Regularly backup PostgreSQL data
-- **API Quota**: Be aware of Currents API free tier limits
-- **Log Management**: Periodically clean Airflow logs to save disk space
-
-## 🆘 Need Help?
-
-If you encounter issues:
-
-1. Check task logs in Airflow UI
-2. Review `docker-compose logs` output
-3. Verify `.env` file configuration
-4. Ensure all containers are running properly
-5. Refer to the troubleshooting section above
+**Final Project Ready! 🚀**

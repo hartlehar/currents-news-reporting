@@ -49,18 +49,37 @@ def load_main_table(cursor, df):
         )
     """)
 
-    # Insert data
-    df.to_sql("NewsArticles", cursor.connection, if_exists="append", index=False)
+    # Insert data - use INSERT OR IGNORE to avoid duplicates
+    articles_list = []
+    for _, row in df.iterrows():
+        articles_list.append((
+            row.get("id"),
+            row.get("title", ""),
+            row.get("description", ""),
+            row.get("author", ""),
+            None,  # source_id will be updated later
+            row.get("url", ""),
+            row.get("image", ""),
+            row.get("language", ""),
+            row.get("published", None)
+        ))
+    
+    cursor.executemany(
+        """INSERT OR IGNORE INTO NewsArticles 
+           (id, title, description, author, source_id, url, image, language, published)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        articles_list
+    )
 
 
 # ------------------------------------------------------------------------------
-#  Load Category Table (Many-to-Many)
+#  Load Category Table (One-to-Many)
 # ------------------------------------------------------------------------------
 
 def load_category_table(cursor, df_full):
     """
     Create and populate the NewsCategory table.
-    Create NewsArticleCategory mapping table for many-to-many relationship.
+    Each news can have multiple categories.
     """
 
     df = df_full.copy()
@@ -68,125 +87,201 @@ def load_category_table(cursor, df_full):
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS NewsCategory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category TEXT
+            category TEXT UNIQUE
         )
     """)
 
-    df["category"] = df["category"].apply(ast.literal_eval)
-    unique_cats = set().union(*df["category"])
+    # Parse categories safely
+    unique_cats = set()
+    for _, row in df.iterrows():
+        if pd.notna(row.get("category")):
+            try:
+                cats = ast.literal_eval(str(row["category"]))
+                if isinstance(cats, list):
+                    unique_cats.update([str(c).strip() for c in cats if c])
+            except (ValueError, SyntaxError):
+                # If parsing fails, treat as string
+                cat_str = str(row["category"]).strip()
+                if cat_str:
+                    unique_cats.add(cat_str)
 
+    # Insert categories with IGNORE to avoid duplicates
     for cat in unique_cats:
-        cursor.execute("INSERT INTO NewsCategory (category) VALUES (?);", (cat.strip(),))
+        cursor.execute("INSERT OR IGNORE INTO NewsCategory (category) VALUES (?);", (cat,))
 
-
+    # Create association table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS NewsArticleCategory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             news_id TEXT,
             category_id INTEGER,
+            UNIQUE(news_id, category_id),
             FOREIGN KEY (news_id) REFERENCES NewsArticles(id),
             FOREIGN KEY (category_id) REFERENCES NewsCategory(id)
         )
     """)
 
+    # Insert associations
     for _, row in df.iterrows():
-        news_id = row["id"]
-        categories = row["category"]
+        news_id = row.get("id")
+        if pd.notna(row.get("category")):
+            try:
+                cats = ast.literal_eval(str(row["category"]))
+                if isinstance(cats, list):
+                    categories = cats
+                else:
+                    categories = [cats]
+            except (ValueError, SyntaxError):
+                categories = [str(row["category"]).strip()]
 
-        for cat in categories:
-            cursor.execute("SELECT id FROM NewsCategory WHERE category = ?;", (cat.strip(),))
-            cat_id = cursor.fetchone()
-            if cat_id:
-                cursor.execute("""
-                    INSERT INTO NewsArticleCategory (news_id, category_id)
-                    VALUES (?, ?);
-                """, (news_id, cat_id[0]))
-    
-    conn.commit()
+            for cat in categories:
+                cat = str(cat).strip()
+                if cat:
+                    cursor.execute("SELECT id FROM NewsCategory WHERE category = ?;", (cat,))
+                    result = cursor.fetchone()
+                    if result:
+                        cursor.execute(
+                            "INSERT OR IGNORE INTO NewsArticleCategory (news_id, category_id) VALUES (?, ?);",
+                            (news_id, result[0])
+                        )
+
 
 # ------------------------------------------------------------------------------
-#  Load Source Table (Extract Domain) and Map to Articles
+#  Load Source Table (Extract Domain)
 # ------------------------------------------------------------------------------
 
 def load_source_table(cursor, df_full):
     """
-    Create NewsArticleSource mapping table for one-to-many relationship.
+    Create and populate a table mapping news_id to its source domain.
     """
+
     df = df_full.copy()
-    df_source = df[["id", "url"]].rename(columns={"id": "news_id"})
 
-    # Extract domain
-    df_source["source"] = (
-        df_source["url"]
-        .fillna("")
-        .apply(lambda x: re.search(r"https?://([^/]+)/", x).group(1)
-               if re.search(r"https?://([^/]+)/", x) else "")
-    )
-
-    # Clean domain
-    df_source["source"] = (
-        df_source["source"]
-        .str.replace(r"^www\.", "", regex=True)
-        .str.replace(r"\.(com|co|org).*", "", regex=True)
-    )
-
-    df_source = df_source[["news_id", "source"]]
-
+    # Create source table with UNIQUE constraint
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS NewsSource (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            source TEXT NOT NULL
+            source TEXT UNIQUE NOT NULL
         )
     """)
 
-    for source in df_source["source"].unique():
-        cursor.execute("INSERT INTO NewsSource (source) VALUES (?);", (source,))
+    # Extract and clean domains
+    sources_dict = {}  # {source_name: id}
+    
+    for _, row in df.iterrows():
+        url = row.get("url", "")
+        if pd.notna(url) and url:
+            # Extract domain
+            match = re.search(r"https?://([^/]+)", str(url))
+            if match:
+                domain = match.group(1).lower()
+                
+                # Clean domain
+                domain = re.sub(r"^www\.", "", domain)
+                domain = re.sub(r"\.(com|co|org|net|io|uk|de|fr|it|es|br|ru|cn|jp|au|ca).*", "", domain)
+                
+                if domain and domain not in sources_dict:
+                    # Insert with IGNORE to handle duplicates
+                    cursor.execute("INSERT OR IGNORE INTO NewsSource (source) VALUES (?);", (domain,))
+                    
+                    # Get the id
+                    cursor.execute("SELECT id FROM NewsSource WHERE source = ?;", (domain,))
+                    result = cursor.fetchone()
+                    if result:
+                        sources_dict[domain] = result[0]
 
     # Update NewsArticles with source_id
-    for _, row in df_source.iterrows():
-        news_id = row["news_id"]
-        source = row["source"]
-
-        cursor.execute("SELECT id FROM NewsSource WHERE source = ?;", (source,))
-        source_id = cursor.fetchone()
-        if source_id:
-            cursor.execute("""
-                UPDATE NewsArticles
-                SET source_id = ?
-                WHERE id = ?;
-            """, (source_id[0], news_id))
-
-    conn.commit()
+    for _, row in df.iterrows():
+        news_id = row.get("id")
+        url = row.get("url", "")
+        
+        if pd.notna(url) and url:
+            match = re.search(r"https?://([^/]+)", str(url))
+            if match:
+                domain = match.group(1).lower()
+                domain = re.sub(r"^www\.", "", domain)
+                domain = re.sub(r"\.(com|co|org|net|io|uk|de|fr|it|es|br|ru|cn|jp|au|ca).*", "", domain)
+                
+                if domain in sources_dict:
+                    cursor.execute(
+                        "UPDATE NewsArticles SET source_id = ? WHERE id = ?;",
+                        (sources_dict[domain], news_id)
+                    )
 
 
 # ------------------------------------------------------------------------------
 #  Main Process
 # ------------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    print("🔍 Looking for latest CSV in /data/...")
-
-    latest_csv = get_latest_csv("data")
+def main(data_folder="data", db_path="data/news.db"):
+    """
+    Main function to convert CSV to SQLite database.
+    """
+    print("🔍 Looking for latest CSV in", data_folder, "...")
+    latest_csv = get_latest_csv(data_folder)
     print(f"📄 Latest CSV detected: {latest_csv}")
 
-    # Basic cleaned dataframe
-    df = pd.read_csv(latest_csv)
-    df = df.drop(columns=["category"], errors="ignore")
-    df["published"] = pd.to_datetime(df["published"], errors="coerce").dt.date
-
-    # Full version for category & url processing
+    # Load data
+    print("📖 Loading CSV data...")
     df_full = pd.read_csv(latest_csv)
+    print(f"✅ Loaded {len(df_full)} rows")
 
-    # Connect to SQLite database
-    conn = sqlite3.connect("data/news.db")
+    # Prepare dataframe for main table
+    df = df_full.copy()
+    
+    # Handle published date
+    if "published" in df.columns:
+        df["published"] = pd.to_datetime(df["published"], errors="coerce").dt.date
+    
+    # Drop unnecessary columns for main table
+    df = df.drop(columns=["category", "url"], errors="ignore")
+
+    # Connect to SQLite
+    print(f"🔗 Connecting to SQLite: {db_path}")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     print("🛠️ Creating database tables...")
 
-    load_main_table(cursor, df)
-    load_category_table(cursor, df_full)
-    load_source_table(cursor, df_full)
+    try:
+        load_main_table(cursor, df)
+        print("   ✅ NewsArticles table created")
+        
+        load_category_table(cursor, df_full)
+        print("   ✅ NewsCategory tables created")
+        
+        load_source_table(cursor, df_full)
+        print("   ✅ NewsSource table created")
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+        
+        # Verify
+        print("\n📊 Database statistics:")
+        cursor.execute("SELECT COUNT(*) FROM NewsArticles;")
+        article_count = cursor.fetchone()[0]
+        print(f"   📰 Articles: {article_count}")
+        
+        cursor.execute("SELECT COUNT(*) FROM NewsCategory;")
+        category_count = cursor.fetchone()[0]
+        print(f"   📂 Categories: {category_count}")
+        
+        cursor.execute("SELECT COUNT(*) FROM NewsSource;")
+        source_count = cursor.fetchone()[0]
+        print(f"   🌐 Sources: {source_count}")
+        
+        cursor.execute("SELECT COUNT(*) FROM NewsArticleCategory;")
+        assoc_count = cursor.fetchone()[0]
+        print(f"   🔗 Associations: {assoc_count}\n")
+        
+        print("✅ Database successfully built from latest CSV!")
+        
+    except Exception as e:
+        print(f"❌ Error: {str(e)}")
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
-    print("✅ Database successfully built from latest CSV!")
+
+if __name__ == "__main__":
+    main()
