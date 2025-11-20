@@ -6,7 +6,7 @@ RUN mkdir /R_app
 # Set working directory
 WORKDIR /R_app
 
-COPY src/R_app/ .
+COPY R_app/ .
 COPY data/ /R_app/data
 
 # Install R packages

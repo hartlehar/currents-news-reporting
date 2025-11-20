@@ -471,7 +471,7 @@ docker-compose exec -T airflow-webserver \
 
 # 6. Start Shiny (another terminal)
 docker build -t news-shiny -f R_app/Dockerfile.shine .
-docker run -p 3838:3838 -v $(pwd)/data:/data news-shiny
+docker run -p 3838:3838 news-shiny
 
 # 7. Access dashboards
 # Airflow: http://localhost:8080
