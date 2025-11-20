@@ -1,7 +1,5 @@
 # 📰 Currents News Reporting - Data Engineering Pipeline
 
-**MLDS 400 Final Project**
-
 A complete data engineering workflow for news data: **Currents API → Airflow ETL → CSV → PostgreSQL + SQLite → Shiny Dashboard**
 
 All services containerized with Docker Compose.
@@ -116,7 +114,7 @@ docker-compose exec -T airflow-webserver airflow users create \
 
 ```bash
 docker build -t news-shiny -f R_app/Dockerfile.shine .
-docker run -p 3838:3838 -v $(pwd)/data:/data news-shiny
+docker run -p 3838:3838 news-shiny
 ```
 
 🔗 **http://localhost:3838**
@@ -432,20 +430,25 @@ author TEXT
 image TEXT
 language TEXT
 published DATE
-```
-
-### newscategory
-```sql
-id SERIAL PRIMARY KEY
-news_id TEXT REFERENCES newsarticles(id)
-category TEXT
+source_id INTEGER REFERENCES newssource(id)
 ```
 
 ### newssource
 ```sql
 id SERIAL PRIMARY KEY
-news_id TEXT REFERENCES newsarticles(id)
 source TEXT
+```
+
+### newscategory
+```sql
+id SERIAL PRIMARY KEY
+category TEXT
+```
+
+### newsarticlecategory
+```sql
+news_id TEXT REFERENCES newsarticle(id)
+category_id INTEGER REFERENCES newscategory(id)
 ```
 
 ---
@@ -513,7 +516,3 @@ This project covers:
 - ✅ Data visualization with Shiny
 - ✅ API integration
 - ✅ Data processing and transformation
-
----
-
-**Final Project Ready! 🚀**
