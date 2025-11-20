@@ -28,6 +28,7 @@ services:
     platform: linux/amd64
     command: airflow webserver
     environment:
+      PYTHONPATH: "/opt/airflow:/opt/airflow/src"
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${POSTGRES_DB:-airflow}
       AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
@@ -58,6 +59,7 @@ services:
     platform: linux/amd64
     command: airflow scheduler
     environment:
+      PYTHONPATH: "/opt/airflow:/opt/airflow/src"
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${POSTGRES_DB:-airflow}
       AIRFLOW__CORE__LOAD_EXAMPLES: 'False'

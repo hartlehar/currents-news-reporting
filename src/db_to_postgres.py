@@ -10,7 +10,7 @@ from datetime import datetime
 # ---------------------------------------------------------
 # Helper: find the latest CSV file
 # ---------------------------------------------------------
-def get_latest_csv(folder="/data"):
+def get_latest_csv(folder="/opt/airflow/data"):
     """
     Finds the latest CSV file in the specified folder.
     
@@ -283,7 +283,7 @@ def extract_domain(url):
 # ---------------------------------------------------------
 # Main ETL Process
 # ---------------------------------------------------------
-def run_load_to_postgres():
+def run_load_to_postgres(csv_path = None):
     """
     Main ETL process:
     1. Find latest CSV file
@@ -303,7 +303,12 @@ def run_load_to_postgres():
     try:
         # Step 1: Find latest CSV
         print("\n📍 Step 1: Locating CSV file...")
-        latest_csv = get_latest_csv("/data")
+        if csv_path is None:
+            latest_csv = get_latest_csv("/opt/airflow/data")
+        else:
+            latest_csv = csv_path
+        
+        # latest_csv = get_latest_csv("/opt/airflow/data")
         
         # Step 2: Read CSV
         print("\n📖 Step 2: Reading CSV file...")

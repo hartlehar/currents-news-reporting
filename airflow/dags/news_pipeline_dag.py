@@ -1,16 +1,19 @@
 import sys
 import os
 from datetime import datetime, timedelta
+
+# ---------------------------------------------
+# Fix PYTHONPATH before importing anything else
+# ---------------------------------------------
+sys.path.insert(0, "/opt/airflow")
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.models import Variable
 
-# 添加项目根目录到 Python 路径
-sys.path.insert(0, '/opt/airflow')
-
-# 现在可以导入 src 模块
 from src.news_api_utils import fetch_news_to_csv
 from src.db_to_postgres import run_load_to_postgres
+
 
 
 # -------------------------------------------------------------------
@@ -45,7 +48,7 @@ def task_fetch_news(**context):
         start=start_date,
         end=end_date,
         keyword=keyword,
-        output_csv="news_output.csv"
+        output_csv="/opt/airflow/data/news_output.csv"
     )
 
     print("✅ News fetched and saved to CSV.")
