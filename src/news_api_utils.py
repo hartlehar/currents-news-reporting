@@ -81,7 +81,7 @@ def fetch_news_to_csv(api_key, start, end, keyword, output_csv):
     """
 
     # Use absolute path /opt/airflow/data for consistency across containers
-    data_dir = Path("/opt/airflow/data")
+    data_dir = Path("./data")
     
     # Create directory if it doesn't exist
     try:
@@ -173,7 +173,7 @@ if __name__ == "__main__":
 
     # Customize your range + keyword here
     fetch_news_to_csv(
-        api_key=API_KEY,
+        api_key="OIdnY6cCwzUywhdFhjSy2AaN3fk7jOFTjnJh59HzZvGOBsDH",
         start="2025-11-17",
         end="2025-11-18",
         keyword="technology",

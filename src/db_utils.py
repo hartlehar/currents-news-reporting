@@ -54,13 +54,13 @@ def load_main_table(cursor, df):
 
 
 # ------------------------------------------------------------------------------
-#  Load Category Table (Many-to-Many)
+#  Load Category Table (One-to-Many)
 # ------------------------------------------------------------------------------
 
 def load_category_table(cursor, df_full):
     """
     Create and populate the NewsCategory table.
-    Create NewsArticleCategory mapping table for many-to-many relationship.
+    Each news can have multiple categories.
     """
 
     df = df_full.copy()
@@ -100,17 +100,17 @@ def load_category_table(cursor, df_full):
                     INSERT INTO NewsArticleCategory (news_id, category_id)
                     VALUES (?, ?);
                 """, (news_id, cat_id[0]))
-    
-    conn.commit()
+
 
 # ------------------------------------------------------------------------------
-#  Load Source Table (Extract Domain) and Map to Articles
+#  Load Source Table (Extract Domain)
 # ------------------------------------------------------------------------------
 
 def load_source_table(cursor, df_full):
     """
-    Create NewsArticleSource mapping table for one-to-many relationship.
+    Create and populate a table mapping news_id to its source domain.
     """
+
     df = df_full.copy()
     df_source = df[["id", "url"]].rename(columns={"id": "news_id"})
 
@@ -155,29 +155,24 @@ def load_source_table(cursor, df_full):
                 WHERE id = ?;
             """, (source_id[0], news_id))
 
-    conn.commit()
-
 
 # ------------------------------------------------------------------------------
 #  Main Process
 # ------------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    print("🔍 Looking for latest CSV in /data/...")
-
-    latest_csv = get_latest_csv("data")
+def main(data_folder="data", db_path="data/news.db"):
+    print("🔍 Looking for latest CSV in /data/ ...")
+    latest_csv = get_latest_csv(data_folder)
     print(f"📄 Latest CSV detected: {latest_csv}")
 
-    # Basic cleaned dataframe
-    df = pd.read_csv(latest_csv)
-    df = df.drop(columns=["category"], errors="ignore")
+    # Load cleaned dataframe for main table
+    df = pd.read_csv(latest_csv).drop(columns=["category", "url"], errors="ignore")
     df["published"] = pd.to_datetime(df["published"], errors="coerce").dt.date
 
-    # Full version for category & url processing
+    # Full dataframe for category and url processing
     df_full = pd.read_csv(latest_csv)
 
-    # Connect to SQLite database
-    conn = sqlite3.connect("data/news.db")
+    # Connect to SQLite
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     print("🛠️ Creating database tables...")
@@ -190,3 +185,6 @@ if __name__ == "__main__":
     conn.close()
 
     print("✅ Database successfully built from latest CSV!")
+
+if __name__ == "__main__":
+    main()

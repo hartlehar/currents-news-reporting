@@ -10,12 +10,12 @@ from datetime import datetime
 # ---------------------------------------------------------
 # Helper: find the latest CSV file
 # ---------------------------------------------------------
-def get_latest_csv(folder="/opt/airflow/data"):
+def get_latest_csv(folder="/data"):
     """
     Finds the latest CSV file in the specified folder.
     
     Args:
-        folder: Path to search for CSV files (default: /opt/airflow/data)
+        folder: Path to search for CSV files (default: /data)
         
     Returns:
         str: Path to the latest CSV file
@@ -89,24 +89,14 @@ def create_tables(cursor):
 
     try:
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS NewsSource (
-                id SERIAL PRIMARY KEY,
-                source TEXT UNIQUE
-            );
-        """)
-        print("✅ NewsSource table created/verified")
-
-        cursor.execute("""
             CREATE TABLE IF NOT EXISTS NewsArticles (
                 id TEXT PRIMARY KEY,
                 title TEXT,
                 description TEXT,
                 author TEXT,
-                url TEXT,
                 image TEXT,
                 language TEXT,
-                published DATE,
-                source_id INTEGER REFERENCES NewsSource(id)
+                published DATE
             );
         """)
         print("✅ NewsArticles table created/verified")
@@ -114,18 +104,20 @@ def create_tables(cursor):
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS NewsCategory (
                 id SERIAL PRIMARY KEY,
-                category TEXT UNIQUE
+                news_id TEXT REFERENCES NewsArticles(id),
+                category TEXT
             );
         """)
         print("✅ NewsCategory table created/verified")
 
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS NewsArticleCategory (
+            CREATE TABLE IF NOT EXISTS NewsSource (
+                id SERIAL PRIMARY KEY,
                 news_id TEXT REFERENCES NewsArticles(id),
-                category_id INTEGER REFERENCES NewsCategory(id)
+                source TEXT
             );
         """)
-        print("✅ NewsArticleCategory table created/verified")
+        print("✅ NewsSource table created/verified")
         
     except psycopg2.Error as e:
         raise Exception(f"❌ Failed to create tables: {str(e)}")
@@ -146,19 +138,18 @@ def load_main_table(cursor, df):
     
     try:
         rows = df[[
-            "id", "title", "description", "url", "author",
+            "id", "title", "description", "author",
             "image", "language", "published"
         ]].values.tolist()
 
         sql = """
             INSERT INTO NewsArticles
-            (id, title, description, url, author, image, language, published)
+            (id, title, description, author, image, language, published)
             VALUES %s
             ON CONFLICT (id) 
             DO UPDATE SET
                 title = EXCLUDED.title,
                 description = EXCLUDED.description,
-                url = EXCLUDED.url,
                 author = EXCLUDED.author,
                 image = EXCLUDED.image,
                 language = EXCLUDED.language,
@@ -199,47 +190,20 @@ def load_category_table(cursor, df_full):
         # Expand each category into separate row
         df = df.explode("category")
         df = df[df["category"].notna() & (df["category"].str.strip() != "")]
-        df["category"] = df["category"].str.strip()
 
-        unique_categories = df["category"].drop_duplicates().tolist()
-        if unique_categories:
-            category_rows = [(c,) for c in unique_categories]
-            sql_insert_categories = """
-                INSERT INTO NewsCategory (category)
-                VALUES %s
-                ON CONFLICT (category) DO NOTHING;
-            """
-            execute_values(cursor, sql_insert_categories, category_rows)
-            print(f"✅ Loaded {len(category_rows)} unique categories into NewsCategory")
-        else:
+        rows = df[["id", "category"]].values.tolist()
+
+        if not rows:
             print("ℹ️  No categories to load")
             return
 
-        # --- Insert into NewsArticleCategory join table ---
-        for _, row in df.iterrows():
-            article_id = row["id"]
-            category_name = row["category"]
+        sql = """
+            INSERT INTO NewsCategory (news_id, category)
+            VALUES %s;
+        """
 
-            # Get category_id
-            cursor.execute(
-                "SELECT id FROM NewsCategory WHERE category = %s;",
-                (category_name,)
-            )
-            result = cursor.fetchone()
-            if not result:
-                continue
-            category_id = result[0]
-
-            # Insert article-category mapping
-            cursor.execute(
-                """
-                INSERT INTO NewsArticleCategory (news_id, category_id)
-                VALUES (%s, %s);
-                """,
-                (article_id, category_id)
-            )
-
-        print("✅ Updated NewsArticleCategory join table with article-category mappings")
+        execute_values(cursor, sql, rows)
+        print(f"✅ Loaded {len(rows)} category entries into NewsCategory")
         
     except Exception as e:
         raise Exception(f"❌ Failed to load categories: {str(e)}")
@@ -265,48 +229,19 @@ def load_source_table(cursor, df_full):
         # Filter out empty sources
         df = df[df["source"] != ""]
 
-        rows = df[["source"]].values.tolist()
+        rows = df[["id", "source"]].values.tolist()
 
         if not rows:
             print("ℹ️  No sources to load")
             return
 
         sql = """
-            INSERT INTO NewsSource (source)
-            VALUES %s
-            ON CONFLICT (source) DO NOTHING;
+            INSERT INTO NewsSource (news_id, source)
+            VALUES %s;
         """
 
         execute_values(cursor, sql, rows)
         print(f"✅ Loaded {len(rows)} source entries into NewsSource")
-
-        for idx, row in df.iterrows():
-            article_id = row["id"]
-            source = row["source"]
-
-            # Get source_id
-            cursor.execute(
-                "SELECT id FROM NewsSource WHERE source = %s;",
-                (source,)
-            )
-            result = cursor.fetchone()
-
-            if not result:
-                continue  # should not happen, but safe
-
-            source_id = result[0]
-
-            # Update the article
-            cursor.execute(
-                """
-                UPDATE NewsArticles
-                SET source_id = %s
-                WHERE id = %s;
-                """,
-                (source_id, article_id)
-            )
-
-        print("✅ Updated NewsArticles with source_id values")
         
     except Exception as e:
         raise Exception(f"❌ Failed to load sources: {str(e)}")
@@ -368,7 +303,7 @@ def run_load_to_postgres():
     try:
         # Step 1: Find latest CSV
         print("\n📍 Step 1: Locating CSV file...")
-        latest_csv = get_latest_csv("/opt/airflow/data")
+        latest_csv = get_latest_csv("/data")
         
         # Step 2: Read CSV
         print("\n📖 Step 2: Reading CSV file...")
