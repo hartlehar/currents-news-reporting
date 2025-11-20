@@ -162,6 +162,24 @@ def load_category_table(cursor, df_full):
 
 
 # ---------------------------------------------------------
+# Extract domain helper
+# ---------------------------------------------------------
+def extract_domain(url):
+    """Extract domain from URL."""
+    if not url or pd.isna(url):
+        return ""
+    try:
+        match = re.search(r"https?://([^/]+)", str(url))
+        if match:
+            domain = match.group(1).lower()
+            domain = re.sub(r"^www\.", "", domain)
+            return domain
+        return ""
+    except:
+        return ""
+
+
+# ---------------------------------------------------------
 # Load source table
 # ---------------------------------------------------------
 def load_source_table(cursor, df_full):
@@ -198,22 +216,22 @@ def load_source_table(cursor, df_full):
     except Exception as e:
         print(f"❌ Error: {str(e)}")
         raise
-    finally:
-        sqlite_conn.close()
-        postgres_engine.dispose()
 
 
 def run_load_to_postgres():
     """CSV → PostgreSQL."""
     print("\n" + "="*50)
     print("🚀 PostgreSQL ETL Starting")
-    print("="*50)
+    print("="*50 + "\n")
+    
+    conn = None
+    cursor = None
     
     try:
         # Load CSV
         latest_csv = get_latest_csv("/opt/airflow/data")
         df = pd.read_csv(latest_csv)
-        print(f"📄 CSV loaded: {len(df)} rows")
+        print(f"📋 CSV loaded: {len(df)} rows")
         
         # Process dates
         df["published"] = pd.to_datetime(df["published"], errors="coerce").dt.date
@@ -222,20 +240,28 @@ def run_load_to_postgres():
         conn = get_pg_conn()
         cursor = conn.cursor()
         
+        print("\n🛠️  Creating tables...\n")
         create_tables(cursor)
+        
+        print("\n📥 Loading data...\n")
         load_main_table(cursor, df)
         load_category_table(cursor, df)
         load_source_table(cursor, df)
         
         conn.commit()
-        cursor.close()
-        conn.close()
         
-        print("✅ PostgreSQL ETL Complete\n")
+        print("\n✅ PostgreSQL ETL Complete\n")
         
     except Exception as e:
-        print(f"❌ ETL Failed: {str(e)}")
+        print(f"\n❌ ETL Failed: {str(e)}\n")
+        if conn:
+            conn.rollback()
         raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 if __name__ == "__main__":

@@ -5,10 +5,10 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.models import Variable
 
-# 添加项目根目录到 Python 路径
+# Add project root to Python path
 sys.path.insert(0, '/opt/airflow')
 
-# 现在可以导入 src 模块
+# Now imports from src/ work correctly
 from src.news_api_utils import fetch_news_to_csv
 from src.db_to_postgres import run_load_to_postgres
 from src.db_utils import main as csv_to_sqlite
@@ -19,13 +19,10 @@ from src.db_utils import main as csv_to_sqlite
 # -------------------------------------------------------------------
 def task_fetch_news(**context):
     """
-    Fetch news from Currents API with dynamic date range.
-    Uses execution_date to determine which period to fetch.
+    Fetch news from Currents API using a dynamic date range.
+    The execution_date provided by Airflow determines which date
+    range to query.
     """
-    print("\n" + "="*70)
-    print("TASK 1: FETCH NEWS FROM API")
-    print("="*70 + "\n")
-    
     api_key = os.getenv("CURRENTS_API_KEY")
     if not api_key:
         raise ValueError("❌ Missing CURRENTS_API_KEY in environment!")
@@ -33,12 +30,11 @@ def task_fetch_news(**context):
     # Get execution date from Airflow context
     execution_date = context['execution_date']
     
-    # Fetch news for the previous day (since we run daily)
-    # This allows time for news to be processed
+    # Fetch news for the previous day (daily pipeline)
     start_date = (execution_date - timedelta(days=1)).strftime("%Y-%m-%d")
     end_date = execution_date.strftime("%Y-%m-%d")
     
-    # Get configurable keyword from Airflow Variables (default: "technology")
+    # Get keyword from Airflow Variable (default: technology)
     keyword = Variable.get("news_keyword", "technology")
     
     print(f"🌐 Fetching news articles...")
@@ -53,7 +49,7 @@ def task_fetch_news(**context):
         output_csv="news_output.csv"
     )
 
-    print("✅ News fetched and saved to CSV.\n")
+    print("✅ News fetched and saved to CSV.")
 
 
 # -------------------------------------------------------------------
@@ -61,53 +57,56 @@ def task_fetch_news(**context):
 # -------------------------------------------------------------------
 def task_load_postgres(**context):
     """
-    Load CSV data into PostgreSQL.
-    Uses execution context for logging and tracking.
+    Load the CSV file into PostgreSQL.
+    Uses execution context for logging and run tracking.
     """
-    print("\n" + "="*70)
-    print("TASK 2: LOAD CSV INTO POSTGRESQL")
-    print("="*70 + "\n")
-    
     run_id = context['dag_run'].run_id
     execution_date = context['execution_date']
     
     print(f"🗄️ Loading CSV data into PostgreSQL...")
     print(f"📍 DAG Run ID: {run_id}")
-    print(f"📅 Execution Date: {execution_date}\n")
+    print(f"📅 Execution Date: {execution_date}")
     
-    try:
-        run_load_to_postgres()
-        print("✅ PostgreSQL ETL complete!\n")
-    except Exception as e:
-        print(f"⚠️ PostgreSQL load warning: {str(e)}")
-        print("⏭️ Continuing to SQLite conversion...\n")
-        # 不中断流程，继续到 SQLite
-
+    run_load_to_postgres()
+    
+    print("✅ PostgreSQL ETL complete!")
+    
 
 # -------------------------------------------------------------------
-# Task 3: Convert CSV to SQLite (New!)
+# Task 3: Convert CSV to SQLite
 # -------------------------------------------------------------------
 def task_csv_to_sqlite(**context):
     """
-    Convert CSV data to SQLite database using db_utils.py.
-    Creates NewsArticles, NewsCategory, NewsArticleCategory, and NewsSource tables.
+    Convert the CSV file into an SQLite database using db_utils.py.
+    Creates the NewsArticles, NewsCategory, NewsArticleCategory,
+    and NewsSource tables.
     """
     print("\n" + "="*70)
     print("TASK 3: CONVERT CSV TO SQLITE")
     print("="*70 + "\n")
     
     execution_date = context['execution_date']
+    data_folder = "/opt/airflow/data"
+    db_path = os.path.join(data_folder, "news.db")
     
     print(f"💾 Converting CSV to SQLite...")
-    print(f"📅 Execution Date: {execution_date}\n")
+    print(f"📅 Execution Date: {execution_date}")
+    print(f"📁 Data folder: {data_folder}")
+    print(f"🗄️ SQLite DB path: {db_path}\n")
     
     try:
         csv_to_sqlite(
-            data_folder="/opt/airflow/data",
-            db_path="/opt/airflow/data/news.db"
+            data_folder=data_folder,
+            db_path=db_path
         )
         
-        print("\n✅ SQLite conversion complete!\n")
+        # Validate DB creation
+        if os.path.exists(db_path):
+            db_size = os.path.getsize(db_path)
+            print(f"\n✅ SQLite conversion complete!")
+            print(f"📊 SQLite DB size: {db_size} bytes\n")
+        else:
+            raise FileNotFoundError(f"❌ SQLite DB not created at {db_path}")
         
     except Exception as e:
         print(f"❌ SQLite conversion failed: {str(e)}\n")
@@ -127,56 +126,60 @@ with DAG(
     doc_md="""
     # News Pipeline DAG
     
-    This DAG fetches news articles from Currents API, loads them into PostgreSQL, 
-    and converts the CSV to SQLite for use with Shiny.
+    This DAG fetches news articles from the Currents API, loads them into PostgreSQL,
+    and converts the CSV file into an SQLite database for Shiny dashboard use.
     
     ## Schedule
     - Runs daily at 00:00 UTC
     
     ## Tasks
-    1. **fetch_news**: Fetches news articles from API (previous day)
-    2. **load_postgres**: Loads CSV data into PostgreSQL database
-    3. **csv_to_sqlite**: Converts CSV to SQLite for Shiny dashboard
+    1. **fetch_news** – Fetch news from the previous day and save as CSV  
+    2. **load_postgres** – Load the CSV into PostgreSQL  
+    3. **csv_to_sqlite** – Convert the CSV to SQLite for Shiny
     
     ## Configuration
-    - Set Airflow Variable `news_keyword` to change search keyword (default: "technology")
-    - API key must be provided via CURRENTS_API_KEY environment variable
+    - Set Airflow Variable `news_keyword` to choose the search keyword  
+    - Environment variable `CURRENTS_API_KEY` is required  
     
     ## Output
-    - CSV: /opt/airflow/data/news_output.csv
-    - PostgreSQL: airflow database (NewsArticles table)
-    - SQLite: /opt/airflow/data/news.db
+    - CSV: `/opt/airflow/data/news_output.csv`
+    - PostgreSQL tables: NewsArticles, NewsCategory, NewsSource
+    - SQLite database: `/opt/airflow/data/news.db`
     
     ## Data Flow
-    API → CSV → PostgreSQL
-              → SQLite → Shiny
+    API → CSV → PostgreSQL  
+                 → SQLite → Shiny dashboard
+    
+    ## Notes
+    - SQLite and PostgreSQL are created independently  
+    - CSV must be available for SQLite conversion  
+    - If PostgreSQL load fails, the pipeline continues to SQLite
     """,
 ) as dag:
 
     fetch_news = PythonOperator(
         task_id="fetch_news",
         python_callable=task_fetch_news,
-        provide_context=True,  # Enable context parameter passing
-        retries=2,  # Retry up to 2 times on failure
-        retry_delay=timedelta(minutes=5),  # Wait 5 minutes between retries
+        provide_context=True,
+        retries=2,
+        retry_delay=timedelta(minutes=5),
     )
 
     load_postgres = PythonOperator(
         task_id="load_postgres",
         python_callable=task_load_postgres,
-        provide_context=True,  # Enable context parameter passing
-        retries=1,  # Retry once on failure
+        provide_context=True,
+        retries=1,
         retry_delay=timedelta(minutes=2),
     )
 
     csv_to_sqlite_task = PythonOperator(
         task_id="csv_to_sqlite",
         python_callable=task_csv_to_sqlite,
-        provide_context=True,  # Enable context parameter passing
-        retries=1,  # Retry once on failure
+        provide_context=True,
+        retries=1,
         retry_delay=timedelta(minutes=2),
     )
 
     # Workflow: fetch → load_postgres → csv_to_sqlite
-    # 即使 load_postgres 失败，也会继续到 csv_to_sqlite
     fetch_news >> load_postgres >> csv_to_sqlite_task
