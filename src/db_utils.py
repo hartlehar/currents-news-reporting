@@ -114,7 +114,6 @@ def load_category_table(cursor, df_full):
     # Create association table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS NewsArticleCategory (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
             news_id TEXT,
             category_id INTEGER,
             UNIQUE(news_id, category_id),

@@ -159,7 +159,7 @@ docker-compose logs -f airflow-scheduler
 
 ```bash
 docker build -t news-shiny -f R_app/Dockerfile.shine .
-docker run -p 3838:3838 -v $(pwd)/data:/data news-shiny
+docker run -p 3838:3838 news-shiny
 ```
 
 **Access:** http://localhost:3838
