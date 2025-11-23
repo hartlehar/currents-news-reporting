@@ -61,14 +61,6 @@ def create_tables(cursor):
 
         # 3. NewsArticles (main table with foreign key to NewsSource)
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS NewsSource (
-                id SERIAL PRIMARY KEY,
-                source TEXT UNIQUE
-            );
-        """)
-        print("✅ NewsSource table created/verified")
-
-        cursor.execute("""
             CREATE TABLE IF NOT EXISTS NewsArticles (
                 id TEXT PRIMARY KEY,
                 title TEXT,
@@ -78,8 +70,7 @@ def create_tables(cursor):
                 url TEXT,
                 image TEXT,
                 language TEXT,
-                published DATE,
-                source_id INTEGER REFERENCES NewsSource(id)
+                published DATE
             );
         """)
         print("✅ NewsArticles table created/verified")
@@ -122,7 +113,6 @@ def load_main_table(cursor, df):
             DO UPDATE SET
                 title = EXCLUDED.title,
                 description = EXCLUDED.description,
-                url = EXCLUDED.url,
                 author = EXCLUDED.author,
                 url = EXCLUDED.url,
                 image = EXCLUDED.image,
@@ -291,11 +281,6 @@ def load_category_table(cursor, df_full):
     except Exception as e:
         raise Exception(f"❌ Failed to load categories: {str(e)}")
 
-    # Remove www. prefix
-    domain = domain.replace("www.", "")
-    
-    # Remove TLD extensions (.com, .co, .org, etc.)
-    domain = re.sub(r"\.(com|co|org|net|info|io|uk|ca|au|de|fr|it|es|nl|be|ch|se|no|dk|fi|pl|ru|br|jp|cn|in|kr).*", "", domain)
 
 # ---------------------------------------------------------
 # Main ETL Process
